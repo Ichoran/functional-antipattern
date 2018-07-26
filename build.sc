@@ -11,7 +11,13 @@ trait Common extends ScalaModule {
     "-Ypartial-unification"
   )}
 
+  // Needed for Thyme snapshot
+  def repositories() = super.repositories ++ Seq(
+    coursier.maven.MavenRepository("https://oss.sonatype.org/content/repositories/snapshots")
+  )
+
   def ivyDeps = Agg(
+    ivy"com.github.ichoran::thyme:0.1.2-SNAPSHOT",  // Benchmarking
     ivy"org.typelevel::cats-core:1.1.0"
   )
 }

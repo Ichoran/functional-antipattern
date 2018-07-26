@@ -1,18 +1,21 @@
 # The Random-as-State Antipatterns
 
 Random numbers are frequently used as an example of the `State` monad.  Generating random
-numbers functionally without a monad is a terrible idea: you open up a risk
-of doing the worst thing you can do with random numbers, while simultaneously making
-them slower and more difficult to use.  As far as FP antipatterns go, this is as close
-to a disaster as it gets.  `State` helps you avoid reuse, but it still isn't as foolproof
-and easy as stateful random numbers.
+numbers functionally without a monad or other way to secure the state is a terrible idea:
+you open up a risk of doing the worst thing you can do with random numbers (reusing them,
+so they're not random!), while simultaneously making them slower and more difficult to use.
+As far as FP antipatterns go, this is as close to a disaster as it gets.  `State` helps you
+avoid the danger, but they're still harder to use in all but the simplest toy examples.
 
-In _rare_ cases, where you both care very deeply about the precise stream of numbers
-_and_ it is very difficult to inspect how the stream is being consumed, `State` is
-sort of okay.  Otherwise, the only reason to use referentially transparent random
-numbers is if literally everything else in your program is referentially transparent
+If literally everything else in your program is referentially transparent
 and you want the simplicity of not ever having to consider that something might not
-be, and you're willing to put up with the dangers and hassles.
+be, and it may be worth putting up with the hassles and possible dangers of `State`.
+But if requirements change, you may find yourself burdened by an awkward and mostly
+unhelpful mechanism.  My recommendation is to choose an alterative: either a better,
+less clumsy state-hiding-and-utilizing mechanism, or, more simply, let a mutable
+class do the right thing for you.
+
+The justification for this attitude is presented below.
 
 ## Background: The State monad for Random Numbers
 
@@ -109,9 +112,9 @@ This enormous speed penalty isn't entirely a consequence of FP, but it _is_ a co
 JVM for now, given the complexity of the optimization required to turn the above into something
 that performs well.
 
-### Aside--bare `s => (s, a)` is a distaster
+### Aside--bare `s => (s, a)` is a disaster
 
-Sometimes the monadic trappings about a simple function get in the way.  Not so with random numbers!
+Sometimes monadic trappings around a simple function get in the way.  Not so with random numbers!
 
 We might try to do away with the whole `State` machinery and, perhaps for somewhat
 better performance, simply write a plain old function (pof)
@@ -179,12 +182,7 @@ Not hard at all!
 
 Let's try with the monadic version.  We can't just use a `for` comprehension, because it doesn't support
 generating arbitrarily nested calls to `flatMap`.  Instead, we can turn to a method called `replicateA` that
-does something similar (the `A` part meaning that you're replicating just the output, not the seeds)
-
-The trick with `sequence` is that it will turn `F[G[A]]` into `G[F[A]]`, that is swap the wrapper order, assuming that
-`G` and `F` are compatible.  It turns out that `State` confuses type inference, but we can explicitly ask for what we
-want, and then it works.  Also, because we're swapping two monads, we need to build up all the operations we want inside
-the same kind of collection we want to end up with.
+does something similar.
 
 
 ```scala
@@ -194,13 +192,15 @@ val nextTF = nextBool.map(b => if (b) 't' else 'f')
 def nextString(length: Int) = nextTF.replicateA(length).map(_.mkString)
 ```
 
-This wasn't terribly arduous, but it also wasn't free.  We needed an extra concept (`replicateA`--just because we
-have `replicateA` doesn't mean we can forget about `fill`!).
+This wasn't terribly arduous, but it wasn't completely free.  We needed a different method
+and thus had more to learn to be productive (just because we have `replicateA` doesn't mean
+we can forget about `fill`!), but since we don't have to think about `fill` as well
+right _now_ this is only slows learning, not understanding once you're familiar.
 
 Note that referential transparency is only buying us that we do not have to understand the
-extremely simple rules for using `Rng`; and we're having to use a wider range of mechanics
-to compensate.  Here', it's not a big deal, once you get used to it, but it's not helping
-us out.
+extremely simple rules for using `Rng`; and with `State` we're having to use a wider range
+of mechanics to compensate.  It's not a big deal, once you get used to it, but it's not
+helping us out.
 
 ## Crisis: don't cross the streams!
 
@@ -274,9 +274,6 @@ val myFooFp = mkFooFp.runA((17, 22)).value
 _Except_ for referential transparency, this is unqualifiedly worse.  Not only is there considerably more
 boilerplate that we have to write to thread the two states into individual states and back, but we have
 the fragile operation of exposing ourself to the random number state and then safely putting it back again.
-
-It's not impossible, and since the area where we have to be very careful is very small, we can probably
-manage it.  But our tasks continue to get harder by insisting on referential transparency.
 
 Now suppose we want to keep building up, creating these:
 
@@ -362,22 +359,35 @@ distinction between producing and storing a value, and that `Rng` does the forme
 
 `State` is a clumsy, unscalable mechanism for carrying state along with a
 computation, but it does royally well at actually enforcing that the state is
-carried along.
+carried along.  (Note: it is less clumsy in Haskell, for instance; the inherent issues
+remain, but expressing solutions is less onorous.)
 
 In the case of random numbers, the problem is solved _autonomously_ by a mutable
 class that takes care of the state on its own.  Not all state problems are like
 this.  But many, including random number generation, are.  This separability,
 the ability to delegate authority for the process to a class who knows (locally)
-how to do the right thing is a very powerful abstraction mechanism.
+how to do the right thing is a very powerful abstraction mechanism.  Random
+numbers are one of the clearest examples, but counters and performance timers
+also tend to have this property, among others.
 
-The desire for referential transparency actually _breaks_ this abstraction
-mechanism by forcing you to care, repeatedly, about just how you are propagating
-your state around.
-
-When your classes can do it for you, mutably, it's often a vastly simpler
-paradigm to use when you have lots of autonomous state.  And random numbers
-are exactly this kind of case.
+Using `State` out of a desire for referential transparency actually _breaks_
+this abstraction mechanism by forcing you to care, repeatedly, about just how
+you are propagating your state around.  `State` works a bit like a political
+state gone awry: you can't just take your kids outside to run and play and scream
+and otherwise mutate their environment;  you need to write an application for
+permission to run, and one for permission to play, and one for permission to
+scream, and one for permission to combine the permits for running and playing,
+and...even though they eventually send a babysitter over to take care of all of
+it, it's not worth all the paperwork.
 
 Bottom line: using `State` for random number generation is (usually) an
-antipattern.  The costs are high.  If you're going to deal with random
-numbers this way, make sure the costs are worth it.
+antipattern.  The costs are high, especially if you have multiple random
+number streams (or other sources of multiple `State`).  If you're going to
+deal with random numbers this way, make sure the costs are worth it.
+
+In contrast, a simple mutable approach is close to foolproof, with one
+proviso: you must maintain a mental distinction between methods that
+_generate_ numbers and those that _store_ numbers.  In many cases, this
+is trivially easy.  If it becomes difficult (e.g. if you use a myriad
+of caches and don't take care to split off and cache your random number
+stream), look for a different solution.
