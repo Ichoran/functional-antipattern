@@ -11,12 +11,17 @@ else.  It's entirely true that while computers are pretty good at keeping track 
 humans are lousy.  Some, like me, are _really_ lousy; some monkey-patch Python and can manage
 remarkably well.  (Compared to a computer, everyone is incredibly lousy, though.)
 
+But some languages (Scala, for instance) give you a wide variety of tools to solve problems.
+The most obvious functional way to solve a problem isn't always the best.  Here, I am
+collecting such cases.
+
 ## How this thing works
 
 I have examples below of what I consider to be anti-patterns in functional programming,
-along with patterns that are usually superior, which may or may not be functional.  If
-you think you have a pattern that solves the problem, let me know (even submit a PR!).
-I will almost surely at least acknowledge the point, even if I don't outright accept the edit.
+along with patterns that are usually superior, which might be functional but certainly
+aren't required to be.  If you think you have a pattern that solves the problem, let
+me know (even submit a PR!).  I will almost surely at least acknowledge the point and
+place the example in another file, even if I don't outright accept the edit.
 
 ## Background
 
